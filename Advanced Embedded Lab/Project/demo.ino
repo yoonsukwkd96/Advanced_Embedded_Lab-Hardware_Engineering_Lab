@@ -13,7 +13,8 @@ const char broker[] = "192.168.59.196";
 int        port     = 1883;
 const char topic[]  = "light_sensor";
 const char topic2[]  = "light_sensor_command";
-//const char topic3[]  = "real_unique_topic_3";
+//const char topic3[]  = "temperature_sensor";
+//const char topic4[] = "temperature_sensor_command";
 
 //set interval for sending messages (milliseconds)
 const long interval = 8000;
@@ -21,6 +22,7 @@ unsigned long previousMillis = 0;
 
 int count = 0;
 int sensorPin = A5; // Declare the input pin here
+// int tempPin = A7;
 
 
 // Serial output in 9600 baud
@@ -67,20 +69,21 @@ void setup()
   Serial.println(topic2);
   Serial.println();
 
+  //  Serial.print("Subscribing to topic: ");
+  //  Serial.println(topic4);
+  //  Serial.println();
+
   // subscribe to a topic
-  //mqttClient.subscribe(topic);
   mqttClient.subscribe(topic2);
-  //mqttClient.subscribe(topic3);
+  //mqttClient.subscribe(topic4);
 
   // topics can be unsubscribed using:
   // mqttClient.unsubscribe(topic);
 
-  //  Serial.print("Topic: ");
-  //  Serial.println(topic);
   Serial.print("Topic: ");
   Serial.println(topic2);
   //  Serial.print("Topic: ");
-  //  Serial.println(topic3);
+  //  Serial.println(topic4);
 
 }
 
@@ -100,6 +103,8 @@ void loop()
     // save the last time a message was sent
     previousMillis = currentMillis;
 
+
+    //-------------Light sensor-----------------
     //    //record random value from A5
     //    int Rvalue = analogRead(A5);
 
@@ -125,12 +130,37 @@ void loop()
     mqttClient.print(resistance);
     mqttClient.endMessage();
 
+    //--------End light sensor-----------------
+
+    //------------Temperature sensor-----------
+
+
+
+
+
+
+    // Serial.print("Sending message to topic: ");
+    // Serial.println(topic3);
+    // Serial.println(temperature);
+
+    // send message, the Print interface can be used to set the message contents
+    //    mqttClient.beginMessage(topic3);
+    //    mqttClient.print(temperature);
+    //    mqttClient.endMessage();
+
+    //--------End temperature sensor-----------
+
     Serial.println();
 
     // ... and here output to the serial interface
     Serial.print("Voltage value:"); Serial.print(voltage); Serial.print("mV");
     Serial.print(", resistance value:"); Serial.print(resistance); Serial.println("Ohm");
     Serial.println("---------------------------------------");
+
+    // ... and here output to the serial interface
+    //    Serial.print("Voltage value:"); Serial.print(voltage); Serial.print("mV");
+    //    Serial.print(", temperature value:"); Serial.print(temperature); Serial.println("Celcius degree");
+    //    Serial.println("---------------------------------------");
 
     delay(500);
   }
@@ -151,13 +181,24 @@ void onMqttMessage(int messageSize) {
     Serial.print(msg);
     led += msg;
   }
-    Serial.print(led);
+  Serial.print(led);
+  if (mqttClient.messageTopic() == "light_sensor_command") {
     if (led == "on") {
       digitalWrite(LED_BUILTIN, HIGH);
     }
     if (led == "off") {
       digitalWrite(LED_BUILTIN, LOW);
     }
+    //  } else if (mqttClient.messageTopic() == "temperature_sensor_command") {
+    //    if (led == "on") {
+    //      digitalWrite(LED_BUILTIN, HIGH);
+    //    }
+    //    if (led == "off") {
+    //      digitalWrite(LED_BUILTIN, LOW);
+    //    }
+    //  }
+
+  }
 
   Serial.println();
   Serial.println();
