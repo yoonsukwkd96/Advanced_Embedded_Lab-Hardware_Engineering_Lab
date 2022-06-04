@@ -1,0 +1,498 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity light_controller is
+ port ( sensor_one  	: in STD_LOGIC; -- Sensors to detect the cars
+	sensor_two  	: in STD_LOGIC;
+	sensor_three    : in STD_LOGIC;
+	sensor_four     : in STD_LOGIC;
+        clk  : in STD_LOGIC; -- clock 
+        rst_n: in STD_LOGIC; -- reset active low 
+	--RED_YELLOW_GREEN (CAR TRAFFIC LIGHTS)
+        light_one  	 : out STD_LOGIC_VECTOR(2 downto 0); 
+        light_two	 : out STD_LOGIC_VECTOR(2 downto 0);	
+	light_three 	 : out STD_LOGIC_VECTOR(2 downto 0);
+	light_four	 : out STD_LOGIC_VECTOR(2 downto 0);
+	
+	--RED_GREEN (PEDESTRIAN TRAFFIC LIGHTS)
+	ped_one			: out STD_LOGIC_VECTOR(1 downto 0);
+	ped_two			: out STD_LOGIC_VECTOR(1 downto 0);
+	ped_three		: out STD_LOGIC_VECTOR(1 downto 0);
+	ped_four		: out STD_LOGIC_VECTOR(1 downto 0);
+	ped_five		: out STD_LOGIC_VECTOR(1 downto 0);
+	ped_six			: out STD_LOGIC_VECTOR(1 downto 0);
+	ped_seven		: out STD_LOGIC_VECTOR(1 downto 0);
+	ped_eight		: out STD_LOGIC_VECTOR(1 downto 0)
+   );
+end light_controller;
+
+
+architecture lc of light_controller is 
+signal counter_1s: std_logic_vector(27 downto 0) := x"0000000";
+signal delay_count: std_logic_vector(3 downto 0) := x"0";
+
+signal delay_red10s_12, delay_red3s_12, delay_red10s_34, delay_red3s_34 : std_logic := '0';
+signal delay_green10s_12, delay_green3s_12, delay_green10s_34, delay_green3s_34 : std_logic := '0';
+signal delay_yellow3s_12, delay_yellow3s_34 : std_logic := '0';
+
+signal red_en10s_12, red_en3s_12, red_en10s_34, red_en3s_34 : std_logic := '0'; 
+signal green_en10s_12, green_en3s_12, green_en10s_34, green_en3s_34 : std_logic := '0';
+signal yellow_en3s_12, yellow_en3s_34 : std_logic := '0';
+
+signal red_en10s_1256, red_en3s_1256, red_en10s_3478, red_en3s_3478 : std_logic := '0';
+signal green_en10s_1256, green_en3s_1256, green_en10s_3478, green_en3s_3478 : std_logic := '0';
+
+signal clk_en1s : std_logic;
+
+type FSM_States is (G12_3478_R34_1256, Y12_R34_1256_G3478, R12_3478_Y34_G1256, 
+		    R12_3478_G34_1256, R12_3478_Y34_G1256_b, Y12_R34_1256_G3478_b);
+signal current_state, next_state : FSM_States; 
+begin
+-- next state FSM sequential logic
+process(clk, rst_n)
+begin
+if(rst_n='0') then
+	current_state <= G12_3478_R34_1256;
+else if(rising_edge(clk)) then
+	current_state <= next_state;
+end if;
+end process;
+ 
+-- FSM combinational logic
+process(current_state, sensor_one, sensor_two, sensor_three, sensor_four, 
+	delay_red10s_12, delay_red3s_12, delay_red10s_34, delay_red3s_34,
+	delay_green10s_12, delay_green3s_12, delay_green10s_34, delay_green3s_34,
+	delay_yellow3s_12, delay_yellow3s_34)
+begin
+case current_state is 
+when G12_3478_R34_1256 => 
+	-- car lane light enables
+	red_en10s_12 <= '0';
+	red_en3s_12 <= '0';
+	red_en10s_34 <= '1';
+	red_en3s_34 <= '0';
+	green_en10s_12 <= '1';
+	green_en3s_12 <= '0';
+	green_en10s_34 <= '0';
+	green_en3s_34 <= '0';
+	yellow_en3s_12 <= '0';
+	yellow_en3s_34 <= '0';
+	-- pedestrian light enables
+	red_en10s_1256 <= '1';
+	red_en3s_1256 <= '0';
+	red_en10s_3478 <= '1';
+	red_en3s_3478 <= '0';
+	green_en10s_1256 <= '0';
+	green_en3s_1256 <= '0';
+	green_en10s_3478 <= '1';
+	green_en3s_3478 <= '0';
+	-- car lane lights
+	light_one <= "001";
+	light_two <= "001";
+	light_three <= "100";
+	light_four <= "100";
+	-- pedestrian lights
+	ped_one <= "10";
+	ped_two <= "10";
+	ped_three <= "01";
+	ped_four <= "01";
+	ped_five <= "10";
+	ped_six <= "10";
+	ped_seven <= "01";
+	ped_eight <= "01";
+	if((sensor_one or sensor_two) = '1') then
+		next_state <= G12_3478_R34_1256;
+	else if((sensor_three or sensor_four) = '1') then
+		next_state <= Y12_R34_1256_G3478;
+	else if((delay_green10s_12 = '1') and (delay_red10s_34 = '1')) then
+		next_state <= Y12_R34_1256_G3478;
+	end if;
+
+when Y12_R34_1256_G3478 => 
+	-- car lane light enables
+	red_en10s_12 <= '0';
+	red_en3s_12 <= '0';
+	red_en10s_34 <= '0';
+	red_en3s_34 <= '1';
+	green_en10s_12 <= '0';
+	green_en3s_12 <= '0';
+	green_en10s_34 <= '0';
+	green_en3s_34 <= '0';
+	yellow_en3s_12 <= '1';
+	yellow_en3s_34 <= '0';
+	-- pedestrian light enables
+	red_en10s_1256 <= '0';
+	red_en3s_1256 <= '1';
+	red_en10s_3478 <= '0';
+	red_en3s_3478 <= '0';
+	green_en10s_1256 <= '0';
+	green_en3s_1256 <= '0';
+	green_en10s_3478 <= '0';
+	green_en3s_3478 <= '1';
+	-- car lane lights
+	light_one <= "010";
+	light_two <= "010";
+	light_three <= "100";
+	light_four <= "100";
+	-- pedestrian lights
+	ped_one <= "10";
+	ped_two <= "10";
+	ped_three <= "10";
+	ped_four <= "10";
+	ped_five <= "10";
+	ped_six <= "10";
+	ped_seven <= "10";
+	ped_eight <= "10";
+	if((sensor_one or sensor_two) = '1') then
+		next_state <= Y12_R34_1256_G3478_b;
+	else if((sensor_three or sensor_four) = '1') then
+		next_state <= R12_3478_Y34_G1256;
+	else if((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
+		next_state <= R12_3478_Y34_G1256;
+	end if;
+
+when R12_3478_Y34_G1256 => 
+	-- car lane light enables
+	red_en10s_12 <= '0';
+	red_en3s_12 <= '1';
+	red_en10s_34 <= '0';
+	red_en3s_34 <= '0';
+	green_en10s_12 <= '0';
+	green_en3s_12 <= '0';
+	green_en10s_34 <= '0';
+	green_en3s_34 <= '0';
+	yellow_en3s_12 <= '0';
+	yellow_en3s_34 <= '1';
+	-- pedestrian light enables
+	red_en10s_1256 <= '0';
+	red_en3s_1256 <= '0';
+	red_en10s_3478 <= '0';
+	red_en3s_3478 <= '1';
+	green_en10s_1256 <= '0';
+	green_en3s_1256 <= '1';
+	green_en10s_3478 <= '0';
+	green_en3s_3478 <= '0';
+	-- car lane lights
+	light_one <= "100";
+	light_two <= "100";
+	light_three <= "010";
+	light_four <= "010";
+	-- pedestrian lights
+	ped_one <= "01";
+	ped_two <= "01";
+	ped_three <= "10";
+	ped_four <= "10";
+	ped_five <= "01";
+	ped_six <= "01";
+	ped_seven <= "10";
+	ped_eight <= "10";
+	if((sensor_one or sensor_two) = '1') then
+		next_state <= R12_3478_Y34_G1256_b;
+	else if((sensor_three or sensor_four) = '1') then
+		next_state <= R12_3478_G34_1256;
+	else if((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
+		next_state <= R12_3478_G34_1256;
+	end if;
+
+when R12_3478_G34_1256 => 
+	-- car lane light enables
+	red_en10s_12 <= '1';
+	red_en3s_12 <= '0';
+	red_en10s_34 <= '0';
+	red_en3s_34 <= '0';
+	green_en10s_12 <= '0';
+	green_en3s_12 <= '0';
+	green_en10s_34 <= '1';
+	green_en3s_34 <= '0';
+	yellow_en3s_12 <= '0';
+	yellow_en3s_34 <= '0';
+	-- pedestrian light enables
+	red_en10s_1256 <= '0';
+	red_en3s_1256 <= '0';
+	red_en10s_3478 <= '1';
+	red_en3s_3478 <= '0';
+	green_en10s_1256 <= '1';
+	green_en3s_1256 <= '0';
+	green_en10s_3478 <= '0';
+	green_en3s_3478 <= '0';
+	-- car lane lights
+	light_one <= "100";
+	light_two <= "100";
+	light_three <= "001";
+	light_four <= "001";
+	-- pedestrian lights
+	ped_one <= "01";
+	ped_two <= "01";
+	ped_three <= "10";
+	ped_four <= "10";
+	ped_five <= "01";
+	ped_six <= "01";
+	ped_seven <= "10";
+	ped_eight <= "10";
+	if((sensor_one or sensor_two) = '1') then
+		next_state <= R12_3478_Y34_G1256_b;
+	else if((sensor_three or sensor_four) = '1') then
+		next_state <= R12_3478_G34_1256;
+	else if((delay_red10s_12 = '1') and (delay_green10s_34 = '1')) then
+		next_state <= R12_3478_Y34_G1256_b;
+	end if;
+
+when R12_3478_Y34_G1256_b => 
+	-- car lane light enables
+	red_en10s_12 <= '0';
+	red_en3s_12 <= '1';
+	red_en10s_34 <= '0';
+	red_en3s_34 <= '0';
+	green_en10s_12 <= '0';
+	green_en3s_12 <= '0';
+	green_en10s_34 <= '0';
+	green_en3s_34 <= '0';
+	yellow_en3s_12 <= '0';
+	yellow_en3s_34 <= '1';
+	-- pedestrian light enables
+	red_en10s_1256 <= '0';
+	red_en3s_1256 <= '0';
+	red_en10s_3478 <= '0';
+	red_en3s_3478 <= '1';
+	green_en10s_1256 <= '0';
+	green_en3s_1256 <= '1';
+	green_en10s_3478 <= '0';
+	green_en3s_3478 <= '0';
+	-- car lane lights
+	light_one <= "100";
+	light_two <= "100";
+	light_three <= "010";
+	light_four <= "010";
+	-- pedestrian lights
+	ped_one <= "01";
+	ped_two <= "01";
+	ped_three <= "10";
+	ped_four <= "10";
+	ped_five <= "01";
+	ped_six <= "01";
+	ped_seven <= "10";
+	ped_eight <= "10";
+	if((sensor_one or sensor_two) = '1') then
+		next_state <= Y12_R34_1256_G3478_b;
+	else if((sensor_three or sensor_four) = '1') then
+		next_state <= R12_3478_Y34_G1256;
+	else if((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
+		next_state <= Y12_R34_1256_G3478_b;
+	end if;
+
+when Y12_R34_1256_G3478_b => 
+	-- car lane light enables
+	red_en10s_12 <= '0';
+	red_en3s_12 <= '0';
+	red_en10s_34 <= '0';
+	red_en3s_34 <= '1';
+	green_en10s_12 <= '0';
+	green_en3s_12 <= '0';
+	green_en10s_34 <= '0';
+	green_en3s_34 <= '0';
+	yellow_en3s_12 <= '1';
+	yellow_en3s_34 <= '0';
+	-- pedestrian light enables
+	red_en10s_1256 <= '0';
+	red_en3s_1256 <= '1';
+	red_en10s_3478 <= '0';
+	red_en3s_3478 <= '0';
+	green_en10s_1256 <= '0';
+	green_en3s_1256 <= '0';
+	green_en10s_3478 <= '0';
+	green_en3s_3478 <= '1';
+	-- car lane lights
+	light_one <= "010";
+	light_two <= "010";
+	light_three <= "100";
+	light_four <= "100";
+	-- pedestrian lights
+	ped_one <= "10";
+	ped_two <= "10";
+	ped_three <= "01";
+	ped_four <= "01";
+	ped_five <= "10";
+	ped_six <= "10";
+	ped_seven <= "01";
+	ped_eight <= "01";
+	if((sensor_one or sensor_two) = '1') then
+		next_state <= G12_3478_R34_1256;
+	else if((sensor_three or sensor_four) = '1') then
+		next_state <= Y12_R34_1256_G3478;
+	else if((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
+		next_state <= G12_3478_R34_1256;
+	end if;
+end case;
+end process;
+
+process(clk)
+begin
+if(rising_edge(clk)) then
+	if(clk_en1s='1') then
+		if(red_en10s_12='1' or red_en3s_12='1' or red_en10s_34='1' or red_en3s_34='1' or
+		   green_en10s_12='1' or green_en3s_12='1' or green_en10s_34='1' or green_en3s_34='1' or 
+		   yellow_en3s_12='1' or yellow_en3s_34='1') then
+			delay_count <= delay_count + x"1";
+			if((delay_count = x"9") and red_en10s_12 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '1';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '1';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and red_en3s_12 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '1';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '1';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '1';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and red_en10s_34 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '1';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '1';
+				delay_green10s_34 <= '0';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and red_en3s_34 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '1';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '0';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '1';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and green_en10s_12 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '1';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '1';
+				delay_green10s_34 <= '0';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and green_en3s_12 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '0';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and green_en10s_34 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '1';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '1';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and green_en3s_34 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '0';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and yellow_en3s_12 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '0';
+				delay_red3s_34 <= '1';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '0';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '1';
+				delay_yellow3s_34 <= '0';
+				
+				delay_count <= x"0";
+			else if((delay_count = x"9") and yellow_en3s_34 = '1') then
+				-- car light delays
+				delay_red10s_12 <= '0';
+				delay_red10s_34 <= '0';
+				delay_red3s_12 <= '1';
+				delay_red3s_34 <= '0';
+				delay_green10s_12 <= '0';
+				delay_green10s_34 <= '0';
+				delay_green3s_12 <= '0';
+				delay_green3s_34 <= '0';
+				delay_yellow3s_12 <= '0';
+				delay_yellow3s_34 <= '1';
+				
+				delay_count <= x"0";
+			end if;
+		end if;
+	end if;
+end if;
+end process;
+
+process(clk)
+begin
+if(rising_edge(clk)) then
+	counter_1s <= counter_1s + x"0000001";
+	if(counter_1s >= x"0000003") then
+	-- x"0004" is for simulation
+	-- change to x"2FAF080" for 50Mhz clock running real FPGA
+	counter_1s <= x"0000000";
+	end if;
+end if;
+end process;
+
+clk_en1s <= '1' when counter_1s = x"0003" else '0';
+-- x"0002" for simulation
+-- x"2FAF080" for 50Mhz clock real FPGA
+end lc; 	
