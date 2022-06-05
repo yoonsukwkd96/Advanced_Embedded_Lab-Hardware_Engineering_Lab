@@ -1,13 +1,57 @@
+--			|  -1-	| sensor_one
+--			|	| pedestrian 1 and 2
+--		       	|	| 
+--			|	|
+--  pedestrian 7 and 8	|	|	pedestrian 3 and 4
+--	   -------------	-------------
+--	  sensor_three			sensor_four
+--	   -3-				  -4-
+--	   -------------	-------------
+-- 			|	|
+--			|	|
+--			|	|
+--			|	| pedestrian 5 and 6
+--			|  -2-	| sensor_two
+
+
+-- States:
+-- Car lights 1 and 2:		Green(10s)   ->   Yellow(3s)   ->   Red(3s)   ->   Red(10s)   ->   Red_b(3s)   ->   Yellow_b(3s)
+-- Car lights 3 and 4:		Red(10s)     ->   Red(3s)      ->   Yellow(3s)->   Green(10s) ->   Yellow(3s)  ->   Red(3s)
+-- Ped lights 1,2,5,6:   	Red(10s)     ->   Red(3s)      ->   Green(3s) ->   Green(10s) ->   Green(3s)   ->   Red(3s)
+-- Ped lights 3,4,7,8:		Green(10s)   ->   Green(3s)    ->   Red(3s)   ->   Red(10s)   ->   Red(3s)     ->   Green(3s)
+
+-- State signal name explanations:
+-- G12_3478_R34_1256: Green is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8; 
+--		      Red is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6
+-- Y12_R34_1256_G3478: Yellow is 'on' for car lights 1,2;
+--		       Red is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6;
+--		       Green is 'on' for pedestrian lights 3,4,7,8
+-- R12_3478_Y34_G1256: Red is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8;
+--		       Yellow is 'on' for car lights 3,4;
+--		       Green is 'on' for pedestrian lights 1,2,5,6
+-- R12_3478_G34_1256:  Red is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8;
+--		       Green is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6 
+-- R12_3478_Y34_G1256_b: Red is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8;
+--		         Yellow is 'on' for car lights 3,4;
+--			 Green is 'on' for pedestrian lights 1,2,5,6
+-- Y12_R34_1256_G3478_b: Yellow is 'on' for car lights 1,2;
+--		         Red is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6;
+--		         Green is 'on' for pedestrian lights 3,4,7,8
+
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity light_controller is
- port ( sensor_one  	: in STD_LOGIC; -- Sensors to detect the cars
+ port (	-- sensor ports (sensor_one,etc.) are ports for the push buttons 
+	sensor_one  	: in STD_LOGIC; -- Sensors to detect the cars
 	sensor_two  	: in STD_LOGIC;
 	sensor_three    : in STD_LOGIC;
 	sensor_four     : in STD_LOGIC;
+	-- clk: stands for clock for the system
         clk  : in STD_LOGIC; -- clock 
+	-- rst_n: resets the system (assigns current state to G12_3478_R34_1256)  
         rst_n: in STD_LOGIC; -- reset active low 
 	--RED_YELLOW_GREEN (CAR TRAFFIC LIGHTS)
         light_one  	 : out STD_LOGIC_VECTOR(2 downto 0); 
@@ -29,22 +73,27 @@ end light_controller;
 
 
 architecture lc of light_controller is 
-signal counter_1s: std_logic_vector(27 downto 0) := x"0000000";
-signal delay_count: std_logic_vector(3 downto 0) := x"0";
+signal counter_1s: std_logic_vector(27 downto 0) := x"0000000"; -- counts every 1s
+signal delay_count: std_logic_vector(3 downto 0) := x"0"; -- time duration for the lights to stay 'on'
 
+-- each light state have certain amount of 'on' duration
 signal delay_red10s_12, delay_red3s_12, delay_red10s_34, delay_red3s_34 : std_logic := '0';
 signal delay_green10s_12, delay_green3s_12, delay_green10s_34, delay_green3s_34 : std_logic := '0';
 signal delay_yellow3s_12, delay_yellow3s_34 : std_logic := '0';
 
+-- enables for the each of the light states with specific durations
 signal red_en10s_12, red_en3s_12, red_en10s_34, red_en3s_34 : std_logic := '0'; 
 signal green_en10s_12, green_en3s_12, green_en10s_34, green_en3s_34 : std_logic := '0';
 signal yellow_en3s_12, yellow_en3s_34 : std_logic := '0';
 
+-- enables for the pedestrian lights 
 signal red_en10s_1256, red_en3s_1256, red_en10s_3478, red_en3s_3478 : std_logic := '0';
 signal green_en10s_1256, green_en3s_1256, green_en10s_3478, green_en3s_3478 : std_logic := '0';
 
+-- clock enable for the 1s clock duration
 signal clk_en1s : std_logic;
 
+-- Finite State Machine states (see above for the explanations)
 type FSM_States is (G12_3478_R34_1256, Y12_R34_1256_G3478, R12_3478_Y34_G1256, 
 		    R12_3478_G34_1256, R12_3478_Y34_G1256_b, Y12_R34_1256_G3478_b);
 signal current_state, next_state : FSM_States; 
@@ -52,9 +101,9 @@ begin
 -- next state FSM sequential logic
 process(clk, rst_n)
 begin
-if(rst_n='0') then
+if(rst_n='0') then -- resets the system and assigns G12_3478_R34_1256 as the current state
 	current_state <= G12_3478_R34_1256;
-elsif(rising_edge(clk)) then
+elsif(rising_edge(clk)) then -- changes the current state to the next state according to the rising edge of the clock
 	current_state <= next_state;
 end if;
 end process;
@@ -65,6 +114,7 @@ process(current_state, sensor_one, sensor_two, sensor_three, sensor_four,
 	delay_green10s_12, delay_green3s_12, delay_green10s_34, delay_green3s_34,
 	delay_yellow3s_12, delay_yellow3s_34)
 begin
+-- here the state declarations start
 case current_state is 
 when G12_3478_R34_1256 => 
 	-- car lane light enables
@@ -101,11 +151,11 @@ when G12_3478_R34_1256 =>
 	ped_six <= "10";
 	ped_seven <= "01";
 	ped_eight <= "01";
-	if((sensor_one or sensor_two) = '1') then
+	if((sensor_one or sensor_two) = '1') then -- if button 1 or 2 pressed 
 		next_state <= G12_3478_R34_1256;
-	elsif((sensor_three or sensor_four) = '1') then
+	elsif((sensor_three or sensor_four) = '1') then -- if button 3 or 4 pressed
 		next_state <= Y12_R34_1256_G3478;
-	elsif((delay_green10s_12 = '1') and (delay_red10s_34 = '1')) then
+	elsif((delay_green10s_12 = '1') and (delay_red10s_34 = '1')) then -- normal flow of the system if none of the buttons pressed
 		next_state <= Y12_R34_1256_G3478;
 	end if;
 
@@ -148,7 +198,7 @@ when Y12_R34_1256_G3478 =>
 		next_state <= Y12_R34_1256_G3478_b;
 	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_Y34_G1256;
-	elsif((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
+	elsif((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then -- normal flow of the system if none of the buttons pressed
 		next_state <= R12_3478_Y34_G1256;
 	end if;
 
@@ -191,7 +241,7 @@ when R12_3478_Y34_G1256 =>
 		next_state <= R12_3478_Y34_G1256_b;
 	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_G34_1256;
-	elsif((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
+	elsif((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then -- normal flow of the system if none of the buttons pressed
 		next_state <= R12_3478_G34_1256;
 	end if;
 
@@ -234,7 +284,7 @@ when R12_3478_G34_1256 =>
 		next_state <= R12_3478_Y34_G1256_b;
 	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_G34_1256;
-	elsif((delay_red10s_12 = '1') and (delay_green10s_34 = '1')) then
+	elsif((delay_red10s_12 = '1') and (delay_green10s_34 = '1')) then -- normal flow of the system if none of the buttons pressed
 		next_state <= R12_3478_Y34_G1256_b;
 	end if;
 
@@ -277,7 +327,7 @@ when R12_3478_Y34_G1256_b =>
 		next_state <= Y12_R34_1256_G3478_b;
 	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_Y34_G1256;
-	elsif((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
+	elsif((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then -- normal flow of the system if none of the buttons pressed
 		next_state <= Y12_R34_1256_G3478_b;
 	end if;
 
@@ -320,12 +370,13 @@ when Y12_R34_1256_G3478_b =>
 		next_state <= G12_3478_R34_1256;
 	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= Y12_R34_1256_G3478;
-	elsif((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
+	elsif((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then -- normal flow of the system if none of the buttons pressed
 		next_state <= G12_3478_R34_1256;
 	end if;
 end case;
 end process;
 
+-- here we define the time durations of the lights
 process(clk)
 begin
 if(rising_edge(clk)) then
@@ -348,7 +399,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			elsif((delay_count = x"9") and red_en3s_12 = '1') then
+			elsif((delay_count = x"2") and red_en3s_12 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -376,7 +427,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			elsif((delay_count = x"9") and red_en3s_34 = '1') then
+			elsif((delay_count = x"2") and red_en3s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -404,7 +455,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			elsif((delay_count = x"9") and green_en3s_12 = '1') then
+			elsif((delay_count = x"2") and green_en3s_12 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -432,7 +483,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			elsif((delay_count = x"9") and green_en3s_34 = '1') then
+			elsif((delay_count = x"2") and green_en3s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -446,7 +497,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			elsif((delay_count = x"9") and yellow_en3s_12 = '1') then
+			elsif((delay_count = x"2") and yellow_en3s_12 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -460,7 +511,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			elsif((delay_count = x"9") and yellow_en3s_34 = '1') then
+			elsif((delay_count = x"2") and yellow_en3s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -480,6 +531,7 @@ if(rising_edge(clk)) then
 end if;
 end process;
 
+-- defining the counting process of the clock(clk)
 process(clk)
 begin
 if(rising_edge(clk)) then

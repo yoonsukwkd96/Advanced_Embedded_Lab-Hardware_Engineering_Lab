@@ -1,13 +1,57 @@
+--			|  -1-	| sensor_one
+--			|	| pedestrian 1 and 2
+--		       	|	| 
+--			|	|
+--  pedestrian 7 and 8	|	|	pedestrian 3 and 4
+--	   -------------	-------------
+--	  sensor_three			sensor_four
+--	   -3-				  -4-
+--	   -------------	-------------
+-- 			|	|
+--			|	|
+--			|	|
+--			|	| pedestrian 5 and 6
+--			|  -2-	| sensor_two
+
+
+-- States:
+-- Car lights 1 and 2:		Green(10s)   ->   Yellow(3s)   ->   Red(3s)   ->   Red(10s)   ->   Red_b(3s)   ->   Yellow_b(3s)
+-- Car lights 3 and 4:		Red(10s)     ->   Red(3s)      ->   Yellow(3s)->   Green(10s) ->   Yellow(3s)  ->   Red(3s)
+-- Ped lights 1,2,5,6:   	Red(10s)     ->   Red(3s)      ->   Green(3s) ->   Green(10s) ->   Green(3s)   ->   Red(3s)
+-- Ped lights 3,4,7,8:		Green(10s)   ->   Green(3s)    ->   Red(3s)   ->   Red(10s)   ->   Red(3s)     ->   Green(3s)
+
+-- State signal name explanations:
+-- G12_3478_R34_1256: Green is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8; 
+--		      Red is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6
+-- Y12_R34_1256_G3478: Yellow is 'on' for car lights 1,2;
+--		       Red is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6;
+--		       Green is 'on' for pedestrian lights 3,4,7,8
+-- R12_3478_Y34_G1256: Red is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8;
+--		       Yellow is 'on' for car lights 3,4;
+--		       Green is 'on' for pedestrian lights 1,2,5,6
+-- R12_3478_G34_1256:  Red is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8;
+--		       Green is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6 
+-- R12_3478_Y34_G1256_b: Red is 'on' for car lights 1,2 and pedestrian lights 3,4,7,8;
+--		         Yellow is 'on' for car lights 3,4;
+--			 Green is 'on' for pedestrian lights 1,2,5,6
+-- Y12_R34_1256_G3478_b: Yellow is 'on' for car lights 1,2;
+--		         Red is 'on' for car lights 3,4 and pedestrian lights 1,2,5,6;
+--		         Green is 'on' for pedestrian lights 3,4,7,8
+
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 entity light_controller is
- port ( sensor_one  	: in STD_LOGIC; -- Sensors to detect the cars
+ port (	-- sensor ports (sensor_one,etc.) are ports for the push buttons 
+	sensor_one  	: in STD_LOGIC; -- Sensors to detect the cars
 	sensor_two  	: in STD_LOGIC;
 	sensor_three    : in STD_LOGIC;
 	sensor_four     : in STD_LOGIC;
+	-- clk: stands for clock for the system
         clk  : in STD_LOGIC; -- clock 
+	-- rst_n: resets the system (assigns current state to G12_3478_R34_1256)  
         rst_n: in STD_LOGIC; -- reset active low 
 	--RED_YELLOW_GREEN (CAR TRAFFIC LIGHTS)
         light_one  	 : out STD_LOGIC_VECTOR(2 downto 0); 
@@ -54,7 +98,7 @@ process(clk, rst_n)
 begin
 if(rst_n='0') then
 	current_state <= G12_3478_R34_1256;
-else if(rising_edge(clk)) then
+elsif(rising_edge(clk)) then
 	current_state <= next_state;
 end if;
 end process;
@@ -103,9 +147,9 @@ when G12_3478_R34_1256 =>
 	ped_eight <= "01";
 	if((sensor_one or sensor_two) = '1') then
 		next_state <= G12_3478_R34_1256;
-	else if((sensor_three or sensor_four) = '1') then
+	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= Y12_R34_1256_G3478;
-	else if((delay_green10s_12 = '1') and (delay_red10s_34 = '1')) then
+	elsif((delay_green10s_12 = '1') and (delay_red10s_34 = '1')) then
 		next_state <= Y12_R34_1256_G3478;
 	end if;
 
@@ -146,9 +190,9 @@ when Y12_R34_1256_G3478 =>
 	ped_eight <= "10";
 	if((sensor_one or sensor_two) = '1') then
 		next_state <= Y12_R34_1256_G3478_b;
-	else if((sensor_three or sensor_four) = '1') then
+	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_Y34_G1256;
-	else if((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
+	elsif((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
 		next_state <= R12_3478_Y34_G1256;
 	end if;
 
@@ -189,9 +233,9 @@ when R12_3478_Y34_G1256 =>
 	ped_eight <= "10";
 	if((sensor_one or sensor_two) = '1') then
 		next_state <= R12_3478_Y34_G1256_b;
-	else if((sensor_three or sensor_four) = '1') then
+	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_G34_1256;
-	else if((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
+	elsif((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
 		next_state <= R12_3478_G34_1256;
 	end if;
 
@@ -232,9 +276,9 @@ when R12_3478_G34_1256 =>
 	ped_eight <= "10";
 	if((sensor_one or sensor_two) = '1') then
 		next_state <= R12_3478_Y34_G1256_b;
-	else if((sensor_three or sensor_four) = '1') then
+	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_G34_1256;
-	else if((delay_red10s_12 = '1') and (delay_green10s_34 = '1')) then
+	elsif((delay_red10s_12 = '1') and (delay_green10s_34 = '1')) then
 		next_state <= R12_3478_Y34_G1256_b;
 	end if;
 
@@ -275,9 +319,9 @@ when R12_3478_Y34_G1256_b =>
 	ped_eight <= "10";
 	if((sensor_one or sensor_two) = '1') then
 		next_state <= Y12_R34_1256_G3478_b;
-	else if((sensor_three or sensor_four) = '1') then
+	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= R12_3478_Y34_G1256;
-	else if((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
+	elsif((delay_red3s_12 = '1') and (delay_yellow3s_34 = '1')) then
 		next_state <= Y12_R34_1256_G3478_b;
 	end if;
 
@@ -318,9 +362,9 @@ when Y12_R34_1256_G3478_b =>
 	ped_eight <= "01";
 	if((sensor_one or sensor_two) = '1') then
 		next_state <= G12_3478_R34_1256;
-	else if((sensor_three or sensor_four) = '1') then
+	elsif((sensor_three or sensor_four) = '1') then
 		next_state <= Y12_R34_1256_G3478;
-	else if((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
+	elsif((delay_yellow3s_12 = '1') and (delay_red3s_34 = '1')) then
 		next_state <= G12_3478_R34_1256;
 	end if;
 end case;
@@ -348,7 +392,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and red_en3s_12 = '1') then
+			elsif((delay_count = x"9") and red_en3s_12 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -362,7 +406,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '1';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and red_en10s_34 = '1') then
+			elsif((delay_count = x"9") and red_en10s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '1';
@@ -376,7 +420,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and red_en3s_34 = '1') then
+			elsif((delay_count = x"9") and red_en3s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -390,7 +434,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and green_en10s_12 = '1') then
+			elsif((delay_count = x"9") and green_en10s_12 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '1';
@@ -404,7 +448,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and green_en3s_12 = '1') then
+			elsif((delay_count = x"9") and green_en3s_12 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -418,7 +462,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and green_en10s_34 = '1') then
+			elsif((delay_count = x"9") and green_en10s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '1';
 				delay_red10s_34 <= '0';
@@ -432,7 +476,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and green_en3s_34 = '1') then
+			elsif((delay_count = x"9") and green_en3s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -446,7 +490,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and yellow_en3s_12 = '1') then
+			elsif((delay_count = x"9") and yellow_en3s_12 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
@@ -460,7 +504,7 @@ if(rising_edge(clk)) then
 				delay_yellow3s_34 <= '0';
 				
 				delay_count <= x"0";
-			else if((delay_count = x"9") and yellow_en3s_34 = '1') then
+			elsif((delay_count = x"9") and yellow_en3s_34 = '1') then
 				-- car light delays
 				delay_red10s_12 <= '0';
 				delay_red10s_34 <= '0';
